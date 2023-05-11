@@ -1,0 +1,8 @@
+{
+"classjson_path": "./class_indices.json",
+"root_path": "../../../",
+"data_set_dir": "data_set",
+"flower_dir": "project_data",
+"weight_path": "./mobilevit_s.pt",
+"train_save_path": "./weights"
+}
