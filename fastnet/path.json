@@ -1,0 +1,8 @@
+{
+"classjson_path": "./class_indices.json",
+"root_path": "/home/a0601/teamsprojects/model/deeplearning/",
+"data_set_dir": "data_set",
+"flower_dir": "project_data",
+"weight_path": "./faster_weights/fasternet_s",
+"train_save_path": "./faster_weights/"
+}
