@@ -7,7 +7,7 @@ comet_ml
 https://github.com/Howl06/classify_project/blob/main/mobilenetv3/train_lazy_experiment.py 
 #  create comet.config ./comet.config
 # [comet] 
-api_key=<comet_ml api_key>
+api_key=<comet_ml api_key> /n
 project_name=<comet_ml project_name>
 workspace=<comet_ml workspace>
 git_directory=
