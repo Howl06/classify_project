@@ -22,22 +22,23 @@ import math
 # heatmap
 import numpy as np
 from PIL import Image,ImageOps
-from utils.utils import GradCAM, show_cam_on_image, center_crop_img
+from utils import GradCAM, show_cam_on_image, center_crop_img
 # from PIL import Image
 # import matplotlib.pyplot as plt
-
 # model
+from model_v3 import mobilenet_v3_large
 from comet_ml.integration.pytorch import log_model
 
 # class weights
 from collections import Counter 
-
 # ema
-from timm.utils import ModelEma
-
+from timm.utils import accuracy, AverageMeter, ModelEma
 # Focal loss
-from utils.focal_loss import FocalLoss
-
+from focal_loss import FocalLoss
+# other optimzer
+from optimizer_lion import Lion
+from Ranger22 import Ranger22
+from ranger21 import Ranger21
 # mixup
 from timm.data.mixup import Mixup
 
@@ -321,7 +322,8 @@ def one_experiment(hyper_params:dict):
                          hyper_params["input_size"],
                          hyper_params["loss_name"],
                          hyper_params["use_ema"],
-                         hyper_params["mixup_cutmix"]
+                         hyper_params["mixup_cutmix"],
+                         hyper_params["different layer lr"]
                          )
     experiment.set_name(exper_name)
     
@@ -335,17 +337,19 @@ def one_experiment(hyper_params:dict):
                 hyper_params["learning_rate"],
                 hyper_params["input_size"],
                 hyper_params["use_ema"],
-                hyper_params["mixup_cutmix"]
+                hyper_params["mixup_cutmix"],
+                hyper_params["different layer lr"]
                 ])
 
     # model
     model_name_set="mobilenet_v3_large"
-    save_name = '/{}_{}_{}_{}_{}_{}.pth'.format(hyper_params["batch_size"],
+    save_name = '/{}_{}_{}_{}_{}_{}_{}.pth'.format(hyper_params["batch_size"],
                                              hyper_params["epochs"], 
                                              hyper_params["alpha"],
                                              model_name_set,
                                              hyper_params["use_ema"],
-                                             hyper_params["mixup_cutmix"]
+                                             hyper_params["mixup_cutmix"],
+                                             hyper_params["different layer lr"]
                                              )
 
     # path_load
@@ -499,8 +503,49 @@ def one_experiment(hyper_params:dict):
         loss_function = hyper_params["loss_function_name"]()
     
     # construct an optimizer
-    params = [p for p in net.parameters() if p.requires_grad]
+    
     num_batches_per_epoch = math.ceil(train_num / hyper_params["batch_size"])
+    
+    if hyper_params["different layer lr"] == "different":
+      # save layer names
+      layer_names = []
+      
+      for idx, (name, param) in enumerate(net.named_parameters()):
+        layer_names.append(name)
+        
+      layer_names.reverse()
+      params = []
+      prev_group_name = layer_names[0].split('.')[1]
+      lr = hyper_params["learning_rate"]
+    
+      # store params & learning rates
+      for idx, name in enumerate(layer_names):
+      
+        # parameter group name
+        cur_group_name = name.split('.')[1]
+
+        # update learning rate
+        if cur_group_name != prev_group_name and name.split('.')[0] != "classifier":
+          lr *= hyper_params["layer lr decay"]
+        prev_group_name = cur_group_name
+        # layer parameters
+        layer_parameters = {'params': [p for n, p in net.named_parameters() if n == name and p.requires_grad],
+                        'lr':     lr}
+        # display info
+        if layer_parameters["params"] != []:
+          print(f'{idx}: lr = {lr:.6f}, {name}')
+        
+        # append layer parameters
+        params += [layer_parameters]
+      # return None
+      # update learning rate
+        
+    else:
+      params = [p for p in net.parameters() if p.requires_grad]
+    
+    
+    
+    
     if hyper_params["optimizer_name_o"] != "Ranger21":
         optimizer = hyper_params["optimizer_name"](
                                 params,
@@ -518,12 +563,15 @@ def one_experiment(hyper_params:dict):
                                 num_batches_per_epoch=num_batches_per_epoch
                                 )
     
-    optimizer = hyper_params["optimizer_name"]([
-                            {'params': net.features.parameters(), 'lr': 0},
-                            {'params': net.classifier.parameters()}
-                            ],
-                            lr= hyper_params["learning_rate"]
-                            )
+    # optimizer = hyper_params["optimizer_name"]([
+                            #{'params': net.features.parameters(), 'lr': 0},
+                            #{'params': net.classifier.parameters()}
+                            #],
+                            #lr= hyper_params["learning_rate"]
+                            #)
+    optimizer = hyper_params["optimizer_name"](params)
+    
+    
     best_acc = 0.0
     save_path = train_save_path
     train_steps = len(train_loader)
@@ -597,11 +645,13 @@ def one_experiment(hyper_params:dict):
                                             epoch=epoch,
                                             hyper_params=hyper_params,
                                             val_num=val_num)    
-        #if val_accurate > 0.9:
-        #    optimizer = hyper_params["optimizer_name"](
-        #                            net.parameters(),
-        #                            lr=hyper_params["learning_rate"]
-        #                            )
+        turn_on_lr = 0
+        if turn_on_lr == 0 and val_accurate > 0.9:
+          turn_on_lr = 1
+          optimizer = hyper_params["optimizer_name"](
+                                  net.parameters(),
+                                  lr=hyper_params["learning_rate"]
+                                    )
         # learning_speed change by val_accurate           
         optimizer.param_groups[0]["lr"] = hyper_params["learning_rate"] * learning_speed(val_accurate, hyper_params["learning_speed"])
 
