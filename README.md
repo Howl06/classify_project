@@ -4,7 +4,7 @@ comet_ml
 "data_set_dir": "data_set", # dir  
 "flower_dir": "project_data", # data_dir  
 # train
-train_lazy_experiment.py 
+mobilenetv3/train_lazy_experiment.py 
 #  create comet.config ./comet.config
 # [comet] 
 api_key=<comet_ml api_key>  
