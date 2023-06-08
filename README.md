@@ -1,5 +1,5 @@
 # classify_project
-mobilenetv3　　
+mobilenetv3  
 comet_ml  
 "root_path": "../../../../", # data_set_root_dir  
 "data_set_dir": "data_set", # dir  
